@@ -24,3 +24,7 @@ web_custom_versions/
 openapi.yaml
 filtered-openapi.yaml
 uv.lock
+# Ignore custom ComfyUI batch scripts and generated launchers
+Start_ComfyUI.bat
+Start_ComfyUI_FlashAttention.bat
+Start_ComfyUI_SageAttention.bat
