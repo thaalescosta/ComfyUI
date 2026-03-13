@@ -14,22 +14,29 @@ echo %yellow%      ComfyUI 1-Click Initial Setup Installer%reset%
 echo %cyan%=======================================================%reset%
 echo.
 
-:: Check if uv is installed
+:: Check if uv is installed, try to install via winget if missing
 where uv >nul 2>&1
 if %errorlevel% neq 0 (
-    echo %red%[ERROR] 'uv' is not installed or not in your system PATH.%reset%
-    echo %yellow%Please install uv first: https://docs.astral.sh/uv/%reset%
-    pause
-    exit /b
+    echo %yellow%'uv' not found. Attempting to install with winget...%reset%
+    winget install --exact --id AstralUV.uv -e || (
+        echo %red%Failed to install uv automatically.%reset%
+        echo %yellow%Please install uv manually from https://docs.astral.sh/uv/%reset%
+        pause
+        exit /b
+    )
 )
 
-:: Check if git is installed
+:: Check if git is installed, try to install via winget if missing
 where git >nul 2>&1
 if %errorlevel% neq 0 (
-    echo %red%[ERROR] 'git' is not installed or not in your system PATH.%reset%
-    pause
-    exit /b
+    echo %yellow%'git' not found. Attempting to install with winget...%reset%
+    winget install --exact --id Git.Git -e || (
+        echo %red%Failed to install git automatically.%reset%
+        pause
+        exit /b
+    )
 )
+
 
 echo %green%[1/5] Creating virtual environment with Python 3.12...%reset%
 if exist ".venv" (
@@ -54,6 +61,9 @@ if exist "requirements.txt" (
 ) else (
     echo %yellow%[Warning] requirements.txt not found in the root directory. Are you in the ComfyUI folder?%reset%
 )
+
+echo %green%[Upgrade] Updating urllib3 and charset_normalizer to suppress requests warnings...%reset%
+uv pip install --upgrade urllib3 charset_normalizer
 
 echo.
 echo %green%[4/5] Cloning ComfyUI-Manager into custom_nodes...%reset%
@@ -82,11 +92,65 @@ if exist "manager_requirements.txt" (
 )
 
 echo.
-echo %cyan%Creating Start_ComfyUI.bat launcher...%reset%
+:: echo %cyan%Creating Start_ComfyUI.bat launcher...%reset%
 echo @echo off^&^&cd /d %%~dp0>".\Start_ComfyUI.bat"
+rem add PYTHONPATH to ensure imports
+
+echo set "PYTHONPATH=%%~dp0"^&^&>>".\Start_ComfyUI.bat"
 echo .\^.venv\Scripts\python.exe -I -W ignore::FutureWarning main.py>>".\Start_ComfyUI.bat"
 echo pause>>".\Start_ComfyUI.bat"
 echo %yellow%Created Start_ComfyUI.bat launcher%reset%
+
+echo.
+:: echo %cyan%Creating desktop shortcut "Run ComfyUI"...%reset%
+setlocal enabledelayedexpansion
+set "desktop=%userprofile%\Desktop"
+set "target=!cd!\Start_ComfyUI.bat"
+set "icon=!cd!\icons\comfyui.ico"
+
+:: Create VBScript to generate the shortcut
+(
+    echo Set oWS = WScript.CreateObject("WScript.Shell"^)
+    echo sLinkFile = "!desktop!\ComfyUI.lnk"
+    echo Set oLink = oWS.CreateShortcut(sLinkFile^)
+    echo oLink.TargetPath = "!target!"
+    echo oLink.WorkingDirectory = "!cd!"
+    echo oLink.IconLocation = "!icon!"
+    echo oLink.Description = "Launch ComfyUI"
+    echo oLink.Save
+) > create_shortcut.vbs
+
+cscript.exe //nologo create_shortcut.vbs
+if %errorlevel% equ 0 (
+    echo %green%Desktop shortcut created successfully!%reset%
+) else (
+    echo %yellow%[Warning] Failed to create desktop shortcut%reset%
+)
+del /f /q create_shortcut.vbs
+
+:: echo.
+:: echo %cyan%Creating desktop shortcut "ComfyUI - Output"...%reset%
+set "output_folder=!cd!\output"
+set "output_icon=!cd!\icons\comfyui-out.ico"
+
+:: Create VBScript to generate the output folder shortcut
+(
+    echo Set oWS = WScript.CreateObject("WScript.Shell"^)
+    echo sLinkFile = "!desktop!\ComfyUI - Output.lnk"
+    echo Set oLink = oWS.CreateShortcut(sLinkFile^)
+    echo oLink.TargetPath = "!output_folder!"
+    echo oLink.IconLocation = "!output_icon!"
+    echo oLink.Description = "Open ComfyUI Output Folder"
+    echo oLink.Save
+) > create_shortcut_output.vbs
+
+cscript.exe //nologo create_shortcut_output.vbs
+if %errorlevel% equ 0 (
+    echo %green%Output folder shortcut created successfully!%reset%
+) else (
+    echo %yellow%[Warning] Failed to create output folder shortcut%reset%
+)
+del /f /q create_shortcut_output.vbs
 
 echo.
 echo %cyan%=======================================================%reset%
